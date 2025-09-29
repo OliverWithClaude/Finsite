@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finsite - Investment Decision Support</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;700;900&family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="main-header">
+            <h1 class="app-title">FINSITE</h1>
+            <p class="app-tagline">Investment Intelligence with Grit</p>
+        </header>
+
+        <main class="main-content">
+            <!-- Ticker Management Section -->
+            <section class="ticker-management">
+                <div class="section-header">
+                    <h2>Watchlist</h2>
+                    <button id="addTickerBtn" class="btn btn-primary">+ Add Ticker</button>
+                </div>
+                
+                <!-- Add Ticker Form (Hidden by default) -->
+                <div id="addTickerForm" class="add-ticker-form hidden">
+                    <div class="form-group">
+                        <input type="text" id="tickerSymbol" placeholder="Enter ticker symbol (e.g., AAPL)" maxlength="10">
+                        <input type="text" id="tickerName" placeholder="Company name (auto-filled)" readonly>
+                        <button id="validateBtn" class="btn btn-secondary">Validate</button>
+                        <button id="saveTickerBtn" class="btn btn-primary" disabled>Save</button>
+                        <button id="cancelBtn" class="btn btn-tertiary">Cancel</button>
+                    </div>
+                    <div id="validationMessage" class="validation-message"></div>
+                </div>
+
+                <!-- Ticker List -->
+                <div id="tickerList" class="ticker-list">
+                    <div class="loading">Loading tickers...</div>
+                </div>
+            </section>
+
+            <!-- Ticker Information Display -->
+            <section class="ticker-info-section">
+                <div class="section-header">
+                    <h2>Company Information</h2>
+                </div>
+                <div id="tickerInfo" class="ticker-info">
+                    <div class="info-placeholder">
+                        <p>Select a ticker from your watchlist to view detailed information</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="main-footer">
+            <p>Finsite &copy; 2024 | Built with pragmatic resilience</p>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Error Toast -->
+    <div id="errorToast" class="error-toast hidden">
+        <span id="errorMessage"></span>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
