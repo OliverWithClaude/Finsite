@@ -797,6 +797,60 @@ input[type="text"]:read-only {
     background: #267575;
 }
 
+/* Chart Modal */
+.chart-modal-content {
+    max-width: 900px;
+    width: 95%;
+}
+
+.chart-container {
+    min-height: 500px;
+    padding: var(--spacing-lg);
+}
+
+.chart-loading {
+    text-align: center;
+    padding: var(--spacing-xxl);
+}
+
+.chart-loading .spinner {
+    margin: 0 auto var(--spacing-lg) auto;
+}
+
+.chart-loading p {
+    color: var(--soft-gray);
+    font-family: var(--font-display);
+    font-size: 1rem;
+}
+
+.chart-error {
+    text-align: center;
+    padding: var(--spacing-xxl);
+    background: rgba(139, 58, 58, 0.1);
+    border-radius: var(--border-radius);
+    margin: var(--spacing-lg);
+}
+
+.chart-error p {
+    color: var(--muted-crimson);
+    font-family: var(--font-display);
+    font-weight: 700;
+}
+
+/* Chart button in table */
+.btn-chart {
+    background: var(--accent-teal);
+    color: var(--off-white);
+    border: 1px solid var(--accent-teal);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 0.75rem;
+    margin-right: var(--spacing-xs);
+}
+
+.btn-chart:hover {
+    background: #267575;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .app-title {
@@ -817,5 +871,19 @@ input[type="text"]:read-only {
     
     .info-grid {
         grid-template-columns: 1fr;
+    }
+    
+    /* Mobile chart adjustments */
+    .chart-modal-content {
+        width: 100%;
+        max-width: 100%;
+        height: 100vh;
+        max-height: 100vh;
+        margin: 0;
+        border-radius: 0;
+    }
+    
+    .chart-container {
+        min-height: 400px;
     }
 }

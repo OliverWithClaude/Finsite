@@ -296,6 +296,27 @@ async def delete_position(position_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Failed to delete position")
 
 
+@app.get("/api/positions/{position_id}/chart-data")
+async def get_position_chart_data(
+    position_id: int, 
+    db: Session = Depends(get_db)
+):
+    """Get chart data for a closed position.
+    
+    Returns price history with entry/exit markers.
+    """
+    try:
+        chart_data = position_service.get_chart_data(db, position_id)
+        return chart_data
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error fetching chart data: {e}")
+        return {
+            "error": "Unable to load chart data. Please try again later."
+        }
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""

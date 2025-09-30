@@ -1,18 +1,22 @@
 """Position management service for Finsite application."""
 
 from sqlalchemy.orm import Session
-from datetime import datetime
-from typing import List, Optional
+from datetime import datetime, timedelta
+from typing import List, Optional, Dict
 import yfinance as yf
 import logging
 
 from app.database import Position, Trade
+from app.price_history_service import PriceHistoryService
 
 logger = logging.getLogger(__name__)
 
 
 class PositionService:
     """Service for managing trading positions."""
+    
+    def __init__(self):
+        self.price_history_service = PriceHistoryService()
     
     def create_position(
         self, 
@@ -193,3 +197,86 @@ class PositionService:
         except Exception as e:
             logger.error(f"Error fetching current price for {ticker}: {e}")
             return None
+    
+    def get_chart_data(self, db: Session, position_id: int) -> Dict:
+        """Get chart data for a closed position.
+        
+        Returns:
+            {
+                "ticker": "AAPL",
+                "entry_date": "2025-01-15",
+                "exit_date": "2025-02-28",
+                "entry_price": 150.50,
+                "exit_price": 155.00,
+                "entry_currency": "USD",
+                "start_date": "2024-11-28",
+                "end_date": "2025-05-28",
+                "prices": [
+                    {"date": "2024-11-28", "close": 145.20},
+                    ...
+                ],
+                "error": None  # or error message if failed
+            }
+        """
+        # Get position from database
+        position = db.query(Position).filter(Position.id == position_id).first()
+        
+        if not position:
+            return {"error": f"Position {position_id} not found"}
+        
+        # Validate position is closed
+        if position.status != 'CLOSED':
+            return {"error": "Can only generate charts for closed positions"}
+        
+        # Calculate exit price: exit_value / shares
+        shares = position.entry_value_eur / position.entry_price_per_share
+        exit_price = position.exit_value_eur / shares
+        
+        # Calculate date range
+        entry_date = datetime.strptime(position.entry_date, '%Y-%m-%d')
+        exit_date = datetime.strptime(position.exit_date, '%Y-%m-%d')
+        today = datetime.now()
+        
+        days_since_exit = (today - exit_date).days
+        
+        if days_since_exit < 90:
+            # Recent exit - extend to today
+            start_date = (entry_date - timedelta(days=90)).strftime('%Y-%m-%d')
+            end_date = today.strftime('%Y-%m-%d')
+        else:
+            # Old exit - fixed window
+            start_date = (entry_date - timedelta(days=90)).strftime('%Y-%m-%d')
+            end_date = (exit_date + timedelta(days=90)).strftime('%Y-%m-%d')
+        
+        # Get price history
+        try:
+            prices = self.price_history_service.get_price_history(
+                db=db,
+                ticker=position.ticker,
+                start_date=start_date,
+                end_date=end_date
+            )
+            
+            if not prices:
+                return {
+                    "error": f"No price data available for {position.ticker}"
+                }
+            
+            return {
+                "ticker": position.ticker,
+                "entry_date": position.entry_date,
+                "exit_date": position.exit_date,
+                "entry_price": round(position.entry_price_per_share, 2),
+                "exit_price": round(exit_price, 2),
+                "entry_currency": position.entry_currency,
+                "start_date": start_date,
+                "end_date": end_date,
+                "prices": prices,
+                "error": None
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting chart data for position {position_id}: {e}")
+            return {
+                "error": "Unable to load chart data. Please try again later."
+            }

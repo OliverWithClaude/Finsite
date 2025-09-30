@@ -1,7 +1,7 @@
 """Pydantic models for request/response validation."""
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -98,3 +98,23 @@ class ClosedPositionDetail(PositionResponse):
     profit_eur: float
     profit_percent: float
     holding_period_days: int
+
+
+class ChartDataPoint(BaseModel):
+    """Single price data point."""
+    date: str
+    close: float
+
+
+class PositionChartData(BaseModel):
+    """Chart data for a position."""
+    ticker: str
+    entry_date: str
+    exit_date: str
+    entry_price: float
+    exit_price: float
+    entry_currency: str
+    start_date: str
+    end_date: str
+    prices: List[ChartDataPoint]
+    error: Optional[str] = None

@@ -17,7 +17,8 @@ const API = {
     validateTicker: '/api/validate-ticker',
     positionsOpen: '/api/positions/open',
     positionsClosed: '/api/positions/closed',
-    positionClose: (id) => `/api/positions/${id}/close`
+    positionClose: (id) => `/api/positions/${id}/close`,
+    positionChartData: (id) => `/api/positions/${id}/chart-data`
 };
 
 // DOM elements
@@ -67,6 +68,14 @@ const elements = {
     sellRefEntryValue: document.getElementById('sellRefEntryValue'),
     sellRefEntryPrice: document.getElementById('sellRefEntryPrice'),
     
+    // Chart Modal
+    chartModal: document.getElementById('chartModal'),
+    chartModalTicker: document.getElementById('chartModalTicker'),
+    chartLoading: document.getElementById('chartLoading'),
+    chartError: document.getElementById('chartError'),
+    chartErrorMessage: document.getElementById('chartErrorMessage'),
+    chartContainer: document.getElementById('chartContainer'),
+    
     // Utility
     loadingOverlay: document.getElementById('loadingOverlay'),
     errorToast: document.getElementById('errorToast'),
@@ -114,6 +123,14 @@ function initializeEventListeners() {
     });
     elements.sellModal.addEventListener('click', (e) => {
         if (e.target === elements.sellModal) closeSellModal();
+    });
+    
+    // Chart Modal
+    document.querySelectorAll('#chartModal .modal-close').forEach(btn => {
+        btn.addEventListener('click', closeChartModal);
+    });
+    elements.chartModal.addEventListener('click', (e) => {
+        if (e.target === elements.chartModal) closeChartModal();
     });
     
     // Set default date to today
@@ -661,7 +678,7 @@ function renderClosedPositions(positions) {
                     <th>Profit/Loss</th>
                     <th>P/L %</th>
                     <th>Days Held</th>
-                    <th>Action</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -684,6 +701,9 @@ function renderClosedPositions(positions) {
                         </td>
                         <td>${pos.holding_period_days}</td>
                         <td>
+                            <button class="btn btn-secondary btn-chart" onclick="openChartModal(${pos.id}, '${pos.ticker}')">
+                                Chart
+                            </button>
                             <button class="btn btn-danger" onclick="deleteClosedPosition(${pos.id}, '${pos.ticker}')">
                                 Delete
                             </button>
@@ -720,6 +740,178 @@ window.deleteClosedPosition = async function(positionId, ticker) {
     } finally {
         hideLoading();
     }
+}
+
+// Chart Modal Functions
+window.openChartModal = async function(positionId, ticker) {
+    // 1. Open modal
+    elements.chartModalTicker.textContent = ticker;
+    elements.chartModal.classList.remove('hidden');
+    
+    // 2. Show loading state
+    elements.chartLoading.classList.remove('hidden');
+    elements.chartError.classList.add('hidden');
+    elements.chartContainer.classList.add('hidden');
+    
+    try {
+        // 3. Fetch chart data
+        const response = await fetch(API.positionChartData(positionId));
+        const data = await response.json();
+        
+        // 4. Handle errors
+        if (data.error) {
+            showChartError(data.error);
+            return;
+        }
+        
+        // 5. Render chart
+        renderChart(data);
+        
+    } catch (error) {
+        showChartError('Failed to load chart data. Please try again.');
+    }
+}
+
+function showChartError(message) {
+    elements.chartLoading.classList.add('hidden');
+    elements.chartError.classList.remove('hidden');
+    elements.chartErrorMessage.textContent = message;
+}
+
+function renderChart(data) {
+    elements.chartLoading.classList.add('hidden');
+    elements.chartError.classList.add('hidden');
+    elements.chartContainer.classList.remove('hidden');
+    
+    // Prepare data for Plotly
+    const dates = data.prices.map(p => p.date);
+    const prices = data.prices.map(p => p.close);
+    
+    // Main price line
+    const priceTrace = {
+        x: dates,
+        y: prices,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Price',
+        line: {
+            color: '#1C3D5A',  // Deep Navy
+            width: 2
+        },
+        hovertemplate: '%{y:.2f}<extra></extra>'
+    };
+    
+    // Entry marker
+    const entryTrace = {
+        x: [data.entry_date],
+        y: [data.entry_price],
+        type: 'scatter',
+        mode: 'markers+text',
+        name: 'Entry',
+        marker: {
+            color: '#2E8B8B',  // Accent Teal
+            size: 12,
+            symbol: 'circle'
+        },
+        text: ['Entry'],
+        textposition: 'top center',
+        textfont: {
+            size: 12,
+            color: '#2E8B8B',
+            family: 'Source Sans 3, sans-serif',
+            weight: 700
+        },
+        hovertemplate: 'Entry: %{y:.2f}<extra></extra>'
+    };
+    
+    // Exit marker
+    const exitTrace = {
+        x: [data.exit_date],
+        y: [data.exit_price],
+        type: 'scatter',
+        mode: 'markers+text',
+        name: 'Exit',
+        marker: {
+            color: '#D08C34',  // Warm Ochre
+            size: 12,
+            symbol: 'circle'
+        },
+        text: ['Exit'],
+        textposition: 'top center',
+        textfont: {
+            size: 12,
+            color: '#D08C34',
+            family: 'Source Sans 3, sans-serif',
+            weight: 700
+        },
+        hovertemplate: 'Exit: %{y:.2f}<extra></extra>'
+    };
+    
+    const layout = {
+        title: {
+            text: `${data.ticker} - Price History`,
+            font: {
+                family: 'Source Sans 3, sans-serif',
+                size: 18,
+                color: '#1C3D5A',
+                weight: 700
+            }
+        },
+        xaxis: {
+            title: 'Date',
+            gridcolor: 'rgba(169, 169, 169, 0.2)',
+            tickfont: {
+                family: 'Merriweather, serif',
+                size: 11
+            }
+        },
+        yaxis: {
+            title: `Price (${data.entry_currency})`,
+            gridcolor: 'rgba(169, 169, 169, 0.2)',
+            tickfont: {
+                family: 'Merriweather, serif',
+                size: 11
+            }
+        },
+        plot_bgcolor: '#F2E8DC',  // Off-White
+        paper_bgcolor: '#F2E8DC',
+        hovermode: 'x unified',
+        showlegend: true,
+        legend: {
+            x: 0,
+            y: 1.1,
+            orientation: 'h',
+            font: {
+                family: 'Source Sans 3, sans-serif',
+                size: 11
+            }
+        },
+        margin: {
+            l: 60,
+            r: 30,
+            t: 80,
+            b: 60
+        }
+    };
+    
+    const config = {
+        responsive: true,
+        displayModeBar: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d']
+    };
+    
+    Plotly.newPlot(
+        'chartContainer', 
+        [priceTrace, entryTrace, exitTrace], 
+        layout, 
+        config
+    );
+}
+
+function closeChartModal() {
+    elements.chartModal.classList.add('hidden');
+    elements.chartContainer.innerHTML = '';  // Clear chart
 }
 
 // Utility Functions

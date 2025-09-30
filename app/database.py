@@ -1,6 +1,6 @@
 """Database models for Finsite application."""
 
-from sqlalchemy import create_engine, Column, String, DateTime, Float, Integer, ForeignKey
+from sqlalchemy import create_engine, Column, String, DateTime, Float, Integer, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -93,6 +93,31 @@ class Trade(Base):
             "amount_eur": self.amount_eur,
             "price_per_share": self.price_per_share,
             "currency": self.currency,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class PriceHistory(Base):
+    """Model for storing historical price data (cached from yfinance)."""
+    __tablename__ = "price_history"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    ticker = Column(String, nullable=False, index=True)
+    date = Column(String, nullable=False)  # Format: YYYY-MM-DD
+    close_price = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        UniqueConstraint('ticker', 'date', name='uix_ticker_date'),
+        Index('idx_price_history_ticker_date', 'ticker', 'date'),
+    )
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "ticker": self.ticker,
+            "date": self.date,
+            "close_price": self.close_price,
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
 

@@ -193,6 +193,28 @@
         </div>
     </div>
 
+    <!-- Chart Modal -->
+    <div id="chartModal" class="modal hidden">
+        <div class="modal-content chart-modal-content">
+            <div class="modal-header">
+                <h3>Position Chart - <span id="chartModalTicker"></span></h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="chartLoading" class="chart-loading">
+                    <div class="spinner"></div>
+                    <p>Loading chart data...</p>
+                </div>
+                <div id="chartError" class="chart-error hidden">
+                    <p id="chartErrorMessage"></p>
+                </div>
+                <div id="chartContainer" class="chart-container hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plotly CDN -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" charset="utf-8"></script>
     <script src="/static/js/main.js"></script>
 </body>
 </html>
