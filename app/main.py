@@ -9,9 +9,15 @@ from typing import List
 import logging
 import os
 
-from app.database import get_db, Ticker
-from app.models import TickerCreate, TickerResponse, TickerInfo
+from app.database import get_db, Ticker, Position, Trade
+from app.models import (
+    TickerCreate, TickerResponse, TickerInfo,
+    PositionCreate, PositionClose, PositionResponse,
+    OpenPositionDetail, ClosedPositionDetail
+)
 from app.ticker_service import TickerService
+from app.position_service import PositionService
+from app.version import __version__, __codename__
 
 # Configure logging
 logging.basicConfig(
@@ -23,8 +29,8 @@ logger = logging.getLogger(__name__)
 # Initialize FastAPI app
 app = FastAPI(
     title="Finsite",
-    description="Financial information management system with improved validation",
-    version="1.1.0"
+    description="Investment Intelligence with Grit - Personal Investment Workbench",
+    version=__version__
 )
 
 # Setup templates and static files
@@ -32,8 +38,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
-# Initialize ticker service
+# Initialize services
 ticker_service = TickerService()
+position_service = PositionService()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -191,6 +198,104 @@ async def debug_ticker(symbol: str):
     }
 
 
+# Position Management Endpoints
+
+@app.post("/api/positions/open")
+async def open_position(position_data: PositionCreate, db: Session = Depends(get_db)):
+    """Create a new open position with buy trade."""
+    try:
+        position = position_service.create_position(
+            db=db,
+            ticker=position_data.ticker,
+            entry_date=position_data.entry_date,
+            entry_value_eur=position_data.entry_value_eur,
+            entry_price_per_share=position_data.entry_price_per_share,
+            entry_currency=position_data.entry_currency
+        )
+        return position.to_dict()
+    except ValueError as e:
+        logger.error(f"Validation error opening position: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error opening position: {e}")
+        raise HTTPException(status_code=500, detail="Failed to open position")
+
+
+@app.post("/api/positions/{position_id}/close")
+async def close_position(position_id: int, close_data: PositionClose, db: Session = Depends(get_db)):
+    """Close an existing position with sell trade."""
+    try:
+        position = position_service.close_position(
+            db=db,
+            position_id=position_id,
+            exit_date=close_data.exit_date,
+            exit_value_eur=close_data.exit_value_eur,
+            exit_currency=close_data.exit_currency
+        )
+        return position.to_dict()
+    except ValueError as e:
+        logger.error(f"Validation error closing position: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error closing position: {e}")
+        raise HTTPException(status_code=500, detail="Failed to close position")
+
+
+@app.get("/api/positions/open", response_model=List[OpenPositionDetail])
+async def get_open_positions(db: Session = Depends(get_db)):
+    """Get all open positions with current valuations."""
+    try:
+        positions = position_service.get_open_positions(db)
+        return positions
+    except Exception as e:
+        logger.error(f"Error fetching open positions: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch open positions")
+
+
+@app.get("/api/positions/closed", response_model=List[ClosedPositionDetail])
+async def get_closed_positions(db: Session = Depends(get_db)):
+    """Get all closed positions with P&L."""
+    try:
+        positions = position_service.get_closed_positions(db)
+        return positions
+    except Exception as e:
+        logger.error(f"Error fetching closed positions: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch closed positions")
+
+
+@app.get("/api/positions/{position_id}")
+async def get_position(position_id: int, db: Session = Depends(get_db)):
+    """Get a single position by ID."""
+    position = position_service.get_position(db, position_id)
+    
+    if not position:
+        raise HTTPException(status_code=404, detail=f"Position {position_id} not found")
+    
+    return position.to_dict()
+
+
+@app.delete("/api/positions/{position_id}")
+async def delete_position(position_id: int, db: Session = Depends(get_db)):
+    """Delete a closed position."""
+    position = position_service.get_position(db, position_id)
+    
+    if not position:
+        raise HTTPException(status_code=404, detail=f"Position {position_id} not found")
+    
+    if position.status != 'CLOSED':
+        raise HTTPException(status_code=400, detail="Can only delete closed positions")
+    
+    try:
+        db.delete(position)
+        db.commit()
+        logger.info(f"Deleted closed position {position_id} for {position.ticker}")
+        return {"message": f"Position {position_id} deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting position {position_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete position")
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
@@ -200,7 +305,8 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "Finsite",
-        "version": "1.1.0",
+        "version": __version__,
+        "codename": __codename__,
         "yfinance_connection": "ok" if test_result else "error"
     }
 

@@ -49,3 +49,52 @@ class TickerInfo(BaseModel):
     currency: Optional[str] = None
     website: Optional[str] = None
     error: Optional[str] = None
+
+
+class PositionCreate(BaseModel):
+    """Model for creating a new position (buy trade)."""
+    ticker: str = Field(..., description="Ticker symbol")
+    entry_date: str = Field(..., description="Entry date (YYYY-MM-DD)")
+    entry_value_eur: float = Field(..., gt=0, description="Total entry value in EUR")
+    entry_price_per_share: float = Field(..., gt=0, description="Price per share at entry")
+    entry_currency: str = Field(..., description="Currency of entry price (EUR or USD)")
+
+
+class PositionClose(BaseModel):
+    """Model for closing a position (sell trade)."""
+    exit_date: str = Field(..., description="Exit date (YYYY-MM-DD)")
+    exit_value_eur: float = Field(..., gt=0, description="Total exit value in EUR")
+    exit_currency: str = Field(..., description="Currency of exit price (EUR or USD)")
+
+
+class PositionResponse(BaseModel):
+    """Model for position response."""
+    id: int
+    ticker: str
+    status: str
+    entry_date: str
+    entry_value_eur: float
+    entry_price_per_share: float
+    entry_currency: str
+    exit_date: Optional[str] = None
+    exit_value_eur: Optional[float] = None
+    exit_currency: Optional[str] = None
+    created_at: str
+    
+    class Config:
+        from_attributes = True
+
+
+class OpenPositionDetail(PositionResponse):
+    """Model for open position with current valuation."""
+    current_price_per_share: Optional[float] = None
+    current_value_eur: Optional[float] = None
+    unrealized_profit_eur: Optional[float] = None
+    unrealized_profit_percent: Optional[float] = None
+
+
+class ClosedPositionDetail(PositionResponse):
+    """Model for closed position with P&L."""
+    profit_eur: float
+    profit_percent: float
+    holding_period_days: int

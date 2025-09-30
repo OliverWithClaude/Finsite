@@ -1,8 +1,8 @@
 """Database models for Finsite application."""
 
-from sqlalchemy import create_engine, Column, String, DateTime, Float, Integer
+from sqlalchemy import create_engine, Column, String, DateTime, Float, Integer, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 import os
 
@@ -30,6 +30,70 @@ class Ticker(Base):
             "symbol": self.symbol,
             "name": self.name,
             "added_date": self.added_date.isoformat() if self.added_date else None
+        }
+
+
+class Position(Base):
+    """Model for storing trading positions."""
+    __tablename__ = "positions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    ticker = Column(String, index=True, nullable=False)
+    status = Column(String, nullable=False)  # 'OPEN' or 'CLOSED'
+    entry_date = Column(String, nullable=False)
+    entry_value_eur = Column(Float, nullable=False)
+    entry_price_per_share = Column(Float, nullable=False)
+    entry_currency = Column(String, nullable=False)  # 'EUR' or 'USD'
+    exit_date = Column(String, nullable=True)
+    exit_value_eur = Column(Float, nullable=True)
+    exit_currency = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    trades = relationship("Trade", back_populates="position", cascade="all, delete-orphan")
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "ticker": self.ticker,
+            "status": self.status,
+            "entry_date": self.entry_date,
+            "entry_value_eur": self.entry_value_eur,
+            "entry_price_per_share": self.entry_price_per_share,
+            "entry_currency": self.entry_currency,
+            "exit_date": self.exit_date,
+            "exit_value_eur": self.exit_value_eur,
+            "exit_currency": self.exit_currency,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class Trade(Base):
+    """Model for storing individual trades."""
+    __tablename__ = "trades"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    position_id = Column(Integer, ForeignKey("positions.id"), nullable=False)
+    ticker = Column(String, nullable=False)
+    trade_type = Column(String, nullable=False)  # 'BUY' or 'SELL'
+    trade_date = Column(String, nullable=False)
+    amount_eur = Column(Float, nullable=False)
+    price_per_share = Column(Float, nullable=False)
+    currency = Column(String, nullable=False)  # 'EUR' or 'USD'
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    position = relationship("Position", back_populates="trades")
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "position_id": self.position_id,
+            "ticker": self.ticker,
+            "trade_type": self.trade_type,
+            "trade_date": self.trade_date,
+            "amount_eur": self.amount_eur,
+            "price_per_share": self.price_per_share,
+            "currency": self.currency,
+            "created_at": self.created_at.isoformat() if self.created_at else None
         }
 
 

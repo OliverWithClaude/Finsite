@@ -16,43 +16,77 @@
             <p class="app-tagline">Investment Intelligence with Grit</p>
         </header>
 
+        <!-- Navigation -->
+        <nav class="main-nav">
+            <button class="nav-btn active" data-view="watchlist">Watchlist</button>
+            <button class="nav-btn" data-view="open-positions">Open Positions</button>
+            <button class="nav-btn" data-view="closed-positions">Closed Positions</button>
+        </nav>
+
         <main class="main-content">
-            <!-- Ticker Management Section -->
-            <section class="ticker-management">
-                <div class="section-header">
-                    <h2>Watchlist</h2>
-                    <button id="addTickerBtn" class="btn btn-primary">+ Add Ticker</button>
-                </div>
-                
-                <!-- Add Ticker Form (Hidden by default) -->
-                <div id="addTickerForm" class="add-ticker-form hidden">
-                    <div class="form-group">
-                        <input type="text" id="tickerSymbol" placeholder="Enter ticker symbol (e.g., AAPL)" maxlength="10">
-                        <input type="text" id="tickerName" placeholder="Company name (auto-filled)" readonly>
-                        <button id="validateBtn" class="btn btn-secondary">Validate</button>
-                        <button id="saveTickerBtn" class="btn btn-primary" disabled>Save</button>
-                        <button id="cancelBtn" class="btn btn-tertiary">Cancel</button>
+            <!-- Watchlist View -->
+            <div id="watchlistView" class="view-container active">
+                <!-- Ticker Management Section -->
+                <section class="ticker-management">
+                    <div class="section-header">
+                        <h2>Watchlist</h2>
+                        <button id="addTickerBtn" class="btn btn-primary">+ Add Ticker</button>
                     </div>
-                    <div id="validationMessage" class="validation-message"></div>
-                </div>
-
-                <!-- Ticker List -->
-                <div id="tickerList" class="ticker-list">
-                    <div class="loading">Loading tickers...</div>
-                </div>
-            </section>
-
-            <!-- Ticker Information Display -->
-            <section class="ticker-info-section">
-                <div class="section-header">
-                    <h2>Company Information</h2>
-                </div>
-                <div id="tickerInfo" class="ticker-info">
-                    <div class="info-placeholder">
-                        <p>Select a ticker from your watchlist to view detailed information</p>
+                    
+                    <!-- Add Ticker Form (Hidden by default) -->
+                    <div id="addTickerForm" class="add-ticker-form hidden">
+                        <div class="form-group">
+                            <input type="text" id="tickerSymbol" placeholder="Enter ticker symbol (e.g., AAPL)" maxlength="10">
+                            <input type="text" id="tickerName" placeholder="Company name (auto-filled)" readonly>
+                            <button id="validateBtn" class="btn btn-secondary">Validate</button>
+                            <button id="saveTickerBtn" class="btn btn-primary" disabled>Save</button>
+                            <button id="cancelBtn" class="btn btn-tertiary">Cancel</button>
+                        </div>
+                        <div id="validationMessage" class="validation-message"></div>
                     </div>
-                </div>
-            </section>
+
+                    <!-- Ticker List -->
+                    <div id="tickerList" class="ticker-list">
+                        <div class="loading">Loading tickers...</div>
+                    </div>
+                </section>
+
+                <!-- Ticker Information Display -->
+                <section class="ticker-info-section">
+                    <div class="section-header">
+                        <h2>Company Information</h2>
+                    </div>
+                    <div id="tickerInfo" class="ticker-info">
+                        <div class="info-placeholder">
+                            <p>Select a ticker from your watchlist to view detailed information</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Open Positions View -->
+            <div id="openPositionsView" class="view-container">
+                <section class="positions-section">
+                    <div class="section-header">
+                        <h2>Open Positions</h2>
+                    </div>
+                    <div id="openPositionsList" class="positions-list">
+                        <div class="loading">Loading open positions...</div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Closed Positions View -->
+            <div id="closedPositionsView" class="view-container">
+                <section class="positions-section">
+                    <div class="section-header">
+                        <h2>Closed Positions</h2>
+                    </div>
+                    <div id="closedPositionsList" class="positions-list">
+                        <div class="loading">Loading closed positions...</div>
+                    </div>
+                </section>
+            </div>
         </main>
 
         <footer class="main-footer">
@@ -68,6 +102,95 @@
     <!-- Error Toast -->
     <div id="errorToast" class="error-toast hidden">
         <span id="errorMessage"></span>
+    </div>
+
+    <!-- Buy Position Modal -->
+    <div id="buyModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Open Position - <span id="buyModalTicker"></span></h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="buyForm">
+                    <div class="form-field">
+                        <label for="buyDate">Entry Date</label>
+                        <input type="date" id="buyDate" required>
+                    </div>
+                    <div class="form-field">
+                        <label for="buyValue">Entry Value (EUR)</label>
+                        <input type="number" id="buyValue" step="0.01" min="0.01" placeholder="3001.00" required>
+                    </div>
+                    <div class="form-field">
+                        <label for="buyPrice">Entry Price per Share</label>
+                        <input type="number" id="buyPrice" step="0.01" min="0.01" placeholder="150.50" required>
+                    </div>
+                    <div class="form-field">
+                        <label for="buyCurrency">Price Currency</label>
+                        <select id="buyCurrency" required>
+                            <option value="EUR">EUR</option>
+                            <option value="USD">USD</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-tertiary" id="buyModalCancel">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Open Position</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sell Position Modal -->
+    <div id="sellModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Close Position - <span id="sellModalTicker"></span></h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Reference Information -->
+                <div class="position-reference">
+                    <h4>Position Details</h4>
+                    <div class="ref-grid">
+                        <div class="ref-item">
+                            <span class="ref-label">Entry Date:</span>
+                            <span id="sellRefEntryDate"></span>
+                        </div>
+                        <div class="ref-item">
+                            <span class="ref-label">Entry Value:</span>
+                            <span id="sellRefEntryValue"></span>
+                        </div>
+                        <div class="ref-item">
+                            <span class="ref-label">Entry Price per Share:</span>
+                            <span id="sellRefEntryPrice"></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <form id="sellForm">
+                    <div class="form-field">
+                        <label for="sellDate">Exit Date</label>
+                        <input type="date" id="sellDate" required>
+                    </div>
+                    <div class="form-field">
+                        <label for="sellValue">Exit Value (EUR)</label>
+                        <input type="number" id="sellValue" step="0.01" min="0.01" placeholder="3011.00" required>
+                    </div>
+                    <div class="form-field">
+                        <label for="sellCurrency">Currency</label>
+                        <select id="sellCurrency" required>
+                            <option value="EUR">EUR</option>
+                            <option value="USD">USD</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-tertiary" id="sellModalCancel">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Close Position</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <script src="/static/js/main.js"></script>

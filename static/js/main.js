@@ -7,16 +7,30 @@
 let currentTickers = [];
 let selectedTicker = null;
 let isValidated = false;
+let currentView = 'watchlist';
+let selectedPosition = null;
 
 // API endpoints
 const API = {
     tickers: '/api/tickers',
     tickerInfo: '/api/ticker-info',
-    validateTicker: '/api/validate-ticker'
+    validateTicker: '/api/validate-ticker',
+    positionsOpen: '/api/positions/open',
+    positionsClosed: '/api/positions/closed',
+    positionClose: (id) => `/api/positions/${id}/close`
 };
 
 // DOM elements
 const elements = {
+    // Navigation
+    navBtns: document.querySelectorAll('.nav-btn'),
+    
+    // Views
+    watchlistView: document.getElementById('watchlistView'),
+    openPositionsView: document.getElementById('openPositionsView'),
+    closedPositionsView: document.getElementById('closedPositionsView'),
+    
+    // Watchlist elements
     addTickerBtn: document.getElementById('addTickerBtn'),
     addTickerForm: document.getElementById('addTickerForm'),
     tickerSymbol: document.getElementById('tickerSymbol'),
@@ -27,6 +41,33 @@ const elements = {
     validationMessage: document.getElementById('validationMessage'),
     tickerList: document.getElementById('tickerList'),
     tickerInfo: document.getElementById('tickerInfo'),
+    
+    // Position lists
+    openPositionsList: document.getElementById('openPositionsList'),
+    closedPositionsList: document.getElementById('closedPositionsList'),
+    
+    // Modals
+    buyModal: document.getElementById('buyModal'),
+    buyModalTicker: document.getElementById('buyModalTicker'),
+    buyForm: document.getElementById('buyForm'),
+    buyDate: document.getElementById('buyDate'),
+    buyValue: document.getElementById('buyValue'),
+    buyPrice: document.getElementById('buyPrice'),
+    buyCurrency: document.getElementById('buyCurrency'),
+    buyModalCancel: document.getElementById('buyModalCancel'),
+    
+    sellModal: document.getElementById('sellModal'),
+    sellModalTicker: document.getElementById('sellModalTicker'),
+    sellForm: document.getElementById('sellForm'),
+    sellDate: document.getElementById('sellDate'),
+    sellValue: document.getElementById('sellValue'),
+    sellCurrency: document.getElementById('sellCurrency'),
+    sellModalCancel: document.getElementById('sellModalCancel'),
+    sellRefEntryDate: document.getElementById('sellRefEntryDate'),
+    sellRefEntryValue: document.getElementById('sellRefEntryValue'),
+    sellRefEntryPrice: document.getElementById('sellRefEntryPrice'),
+    
+    // Utility
     loadingOverlay: document.getElementById('loadingOverlay'),
     errorToast: document.getElementById('errorToast'),
     errorMessage: document.getElementById('errorMessage')
@@ -40,16 +81,67 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Event Listeners
 function initializeEventListeners() {
+    // Navigation
+    elements.navBtns.forEach(btn => {
+        btn.addEventListener('click', () => switchView(btn.dataset.view));
+    });
+    
+    // Watchlist
     elements.addTickerBtn.addEventListener('click', showAddTickerForm);
     elements.cancelBtn.addEventListener('click', hideAddTickerForm);
     elements.validateBtn.addEventListener('click', validateTicker);
     elements.saveTickerBtn.addEventListener('click', saveTicker);
     elements.tickerSymbol.addEventListener('input', onSymbolInput);
     elements.tickerSymbol.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            validateTicker();
-        }
+        if (e.key === 'Enter') validateTicker();
     });
+    
+    // Buy Modal
+    elements.buyModalCancel.addEventListener('click', closeBuyModal);
+    elements.buyForm.addEventListener('submit', handleBuySubmit);
+    document.querySelectorAll('#buyModal .modal-close').forEach(btn => {
+        btn.addEventListener('click', closeBuyModal);
+    });
+    elements.buyModal.addEventListener('click', (e) => {
+        if (e.target === elements.buyModal) closeBuyModal();
+    });
+    
+    // Sell Modal
+    elements.sellModalCancel.addEventListener('click', closeSellModal);
+    elements.sellForm.addEventListener('submit', handleSellSubmit);
+    document.querySelectorAll('#sellModal .modal-close').forEach(btn => {
+        btn.addEventListener('click', closeSellModal);
+    });
+    elements.sellModal.addEventListener('click', (e) => {
+        if (e.target === elements.sellModal) closeSellModal();
+    });
+    
+    // Set default date to today
+    const today = new Date().toISOString().split('T')[0];
+    elements.buyDate.value = today;
+    elements.sellDate.value = today;
+}
+
+// Navigation
+function switchView(view) {
+    currentView = view;
+    
+    // Update nav buttons
+    elements.navBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.view === view);
+    });
+    
+    // Update views
+    elements.watchlistView.classList.toggle('active', view === 'watchlist');
+    elements.openPositionsView.classList.toggle('active', view === 'open-positions');
+    elements.closedPositionsView.classList.toggle('active', view === 'closed-positions');
+    
+    // Load data for the view
+    if (view === 'open-positions') {
+        loadOpenPositions();
+    } else if (view === 'closed-positions') {
+        loadClosedPositions();
+    }
 }
 
 // Show/Hide Add Ticker Form
@@ -191,6 +283,7 @@ function renderTickerList(tickers) {
                 <div class="ticker-name">${ticker.name}</div>
             </div>
             <div class="ticker-actions">
+                <button class="btn btn-success" onclick="openBuyModal('${ticker.symbol}')">Buy</button>
                 <button class="btn btn-danger" onclick="deleteTicker('${ticker.symbol}')">Remove</button>
             </div>
         </div>
@@ -199,7 +292,7 @@ function renderTickerList(tickers) {
     // Add click handlers for ticker selection
     document.querySelectorAll('.ticker-item').forEach(item => {
         item.addEventListener('click', (e) => {
-            if (!e.target.classList.contains('btn-danger')) {
+            if (!e.target.classList.contains('btn')) {
                 selectTicker(item.dataset.symbol);
             }
         });
@@ -212,7 +305,10 @@ async function selectTicker(symbol) {
     document.querySelectorAll('.ticker-item').forEach(item => {
         item.classList.remove('active');
     });
-    document.querySelector(`[data-symbol="${symbol}"]`).classList.add('active');
+    const tickerItem = document.querySelector(`[data-symbol="${symbol}"]`);
+    if (tickerItem) {
+        tickerItem.classList.add('active');
+    }
     
     selectedTicker = symbol;
     showLoading();
@@ -310,7 +406,7 @@ function renderTickerInfoError() {
 }
 
 // Delete Ticker
-async function deleteTicker(symbol) {
+window.deleteTicker = async function(symbol) {
     if (!confirm(`Remove ${symbol} from your watchlist?`)) {
         return;
     }
@@ -338,6 +434,289 @@ async function deleteTicker(symbol) {
         }
     } catch (error) {
         showError('Failed to remove ticker');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Buy Modal Functions
+window.openBuyModal = function(symbol) {
+    selectedTicker = symbol;
+    elements.buyModalTicker.textContent = symbol;
+    elements.buyForm.reset();
+    const today = new Date().toISOString().split('T')[0];
+    elements.buyDate.value = today;
+    elements.buyModal.classList.remove('hidden');
+}
+
+function closeBuyModal() {
+    elements.buyModal.classList.add('hidden');
+    elements.buyForm.reset();
+}
+
+async function handleBuySubmit(e) {
+    e.preventDefault();
+    
+    const positionData = {
+        ticker: selectedTicker,
+        entry_date: elements.buyDate.value,
+        entry_value_eur: parseFloat(elements.buyValue.value),
+        entry_price_per_share: parseFloat(elements.buyPrice.value),
+        entry_currency: elements.buyCurrency.value
+    };
+    
+    showLoading();
+    
+    try {
+        const response = await fetch(API.positionsOpen, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(positionData)
+        });
+        
+        if (response.ok) {
+            closeBuyModal();
+            showSuccess(`Position opened for ${selectedTicker}`);
+            // Refresh open positions if we're on that view
+            if (currentView === 'open-positions') {
+                loadOpenPositions();
+            }
+        } else {
+            const error = await response.json();
+            showError(error.detail || 'Failed to open position');
+        }
+    } catch (error) {
+        showError('Failed to open position');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Load Open Positions
+async function loadOpenPositions() {
+    showLoading();
+    
+    try {
+        const response = await fetch(API.positionsOpen);
+        const positions = await response.json();
+        renderOpenPositions(positions);
+    } catch (error) {
+        showError('Failed to load open positions');
+        elements.openPositionsList.innerHTML = `
+            <div class="no-positions">Failed to load positions</div>
+        `;
+    } finally {
+        hideLoading();
+    }
+}
+
+function renderOpenPositions(positions) {
+    if (positions.length === 0) {
+        elements.openPositionsList.innerHTML = `
+            <div class="no-positions">
+                No open positions yet. Open a position from your watchlist.
+            </div>
+        `;
+        return;
+    }
+    
+    elements.openPositionsList.innerHTML = `
+        <table class="positions-table">
+            <thead>
+                <tr>
+                    <th>Ticker</th>
+                    <th>Entry Date</th>
+                    <th>Entry Value</th>
+                    <th>Entry Price</th>
+                    <th>Current Price</th>
+                    <th>Current Value</th>
+                    <th>Unrealized P/L</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${positions.map(pos => `
+                    <tr>
+                        <td><strong>${pos.ticker}</strong></td>
+                        <td>${pos.entry_date}</td>
+                        <td>€${formatNumber(pos.entry_value_eur, 2)}</td>
+                        <td>${pos.entry_price_per_share} ${pos.entry_currency}</td>
+                        <td>${pos.current_price_per_share ? formatNumber(pos.current_price_per_share, 2) + ' ' + pos.entry_currency : 'N/A'}</td>
+                        <td>${pos.current_value_eur ? '€' + formatNumber(pos.current_value_eur, 2) : 'N/A'}</td>
+                        <td>
+                            ${pos.unrealized_profit_eur !== null ? `
+                                <span class="${pos.unrealized_profit_eur >= 0 ? 'profit-positive' : 'profit-negative'}">
+                                    €${formatNumber(pos.unrealized_profit_eur, 2)} (${formatNumber(pos.unrealized_profit_percent, 2)}%)
+                                </span>
+                            ` : 'N/A'}
+                        </td>
+                        <td>
+                            <button class="btn btn-primary" onclick="openSellModal(${pos.id}, '${pos.ticker}', '${pos.entry_date}', ${pos.entry_value_eur}, ${pos.entry_price_per_share}, '${pos.entry_currency}')">
+                                Close
+                            </button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+// Sell Modal Functions
+window.openSellModal = function(positionId, ticker, entryDate, entryValue, entryPrice, entryCurrency) {
+    selectedPosition = positionId;
+    elements.sellModalTicker.textContent = ticker;
+    elements.sellRefEntryDate.textContent = entryDate;
+    elements.sellRefEntryValue.textContent = `€${formatNumber(entryValue, 2)}`;
+    elements.sellRefEntryPrice.textContent = `${entryPrice} ${entryCurrency}`;
+    
+    elements.sellForm.reset();
+    const today = new Date().toISOString().split('T')[0];
+    elements.sellDate.value = today;
+    elements.sellCurrency.value = entryCurrency;
+    
+    elements.sellModal.classList.remove('hidden');
+}
+
+function closeSellModal() {
+    elements.sellModal.classList.add('hidden');
+    elements.sellForm.reset();
+    selectedPosition = null;
+}
+
+async function handleSellSubmit(e) {
+    e.preventDefault();
+    
+    const closeData = {
+        exit_date: elements.sellDate.value,
+        exit_value_eur: parseFloat(elements.sellValue.value),
+        exit_currency: elements.sellCurrency.value
+    };
+    
+    showLoading();
+    
+    try {
+        const response = await fetch(API.positionClose(selectedPosition), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(closeData)
+        });
+        
+        if (response.ok) {
+            closeSellModal();
+            showSuccess('Position closed successfully');
+            loadOpenPositions();
+        } else {
+            const error = await response.json();
+            showError(error.detail || 'Failed to close position');
+        }
+    } catch (error) {
+        showError('Failed to close position');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Load Closed Positions
+async function loadClosedPositions() {
+    showLoading();
+    
+    try {
+        const response = await fetch(API.positionsClosed);
+        const positions = await response.json();
+        renderClosedPositions(positions);
+    } catch (error) {
+        showError('Failed to load closed positions');
+        elements.closedPositionsList.innerHTML = `
+            <div class="no-positions">Failed to load positions</div>
+        `;
+    } finally {
+        hideLoading();
+    }
+}
+
+function renderClosedPositions(positions) {
+    if (positions.length === 0) {
+        elements.closedPositionsList.innerHTML = `
+            <div class="no-positions">
+                No closed positions yet.
+            </div>
+        `;
+        return;
+    }
+    
+    elements.closedPositionsList.innerHTML = `
+        <table class="positions-table">
+            <thead>
+                <tr>
+                    <th>Ticker</th>
+                    <th>Entry Date</th>
+                    <th>Entry Value</th>
+                    <th>Exit Date</th>
+                    <th>Exit Value</th>
+                    <th>Profit/Loss</th>
+                    <th>P/L %</th>
+                    <th>Days Held</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${positions.map(pos => `
+                    <tr>
+                        <td><strong>${pos.ticker}</strong></td>
+                        <td>${pos.entry_date}</td>
+                        <td>€${formatNumber(pos.entry_value_eur, 2)}</td>
+                        <td>${pos.exit_date}</td>
+                        <td>€${formatNumber(pos.exit_value_eur, 2)}</td>
+                        <td>
+                            <span class="${pos.profit_eur >= 0 ? 'profit-positive' : 'profit-negative'}">
+                                €${formatNumber(pos.profit_eur, 2)}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="${pos.profit_percent >= 0 ? 'profit-positive' : 'profit-negative'}">
+                                ${formatNumber(pos.profit_percent, 2)}%
+                            </span>
+                        </td>
+                        <td>${pos.holding_period_days}</td>
+                        <td>
+                            <button class="btn btn-danger" onclick="deleteClosedPosition(${pos.id}, '${pos.ticker}')">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+// Delete Closed Position
+window.deleteClosedPosition = async function(positionId, ticker) {
+    if (!confirm(`Delete closed position for ${ticker}?`)) {
+        return;
+    }
+    
+    showLoading();
+    
+    try {
+        const response = await fetch(`/api/positions/${positionId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showSuccess(`Position for ${ticker} deleted successfully`);
+            loadClosedPositions();
+        } else {
+            const error = await response.json();
+            showError(error.detail || 'Failed to delete position');
+        }
+    } catch (error) {
+        showError('Failed to delete position');
     } finally {
         hideLoading();
     }
