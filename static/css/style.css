@@ -100,7 +100,7 @@ body {
 /* Main Content */
 .main-content {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 400px 1fr;
     gap: var(--spacing-xxl);
     margin-bottom: var(--spacing-xxl);
 }
@@ -579,12 +579,22 @@ input[type="text"]:read-only {
     font-weight: 900;
 }
 
-/* View Containers */
-.view-container {
+/* Sidebar and Content Areas */
+.sidebar-left {
+    /* Left sidebar is always visible */
+}
+
+.content-right {
+    /* Right content area */
+    min-width: 0; /* Prevent grid blowout */
+}
+
+/* View Content (replaces view-container) */
+.view-content {
     display: none;
 }
 
-.view-container.active {
+.view-content.active {
     display: block;
 }
 
@@ -871,6 +881,19 @@ input[type="text"]:read-only {
     
     .info-grid {
         grid-template-columns: 1fr;
+    }
+    
+    /* On mobile, hide sidebar when viewing positions */
+    .sidebar-left {
+        display: none;
+    }
+    
+    body:has(.view-content.active#tickerInfoSection) .sidebar-left {
+        display: block;
+    }
+    
+    body:has(.view-content.active#tickerInfoSection) .content-right {
+        display: none;
     }
     
     /* Mobile chart adjustments */

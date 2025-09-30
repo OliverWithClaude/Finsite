@@ -24,9 +24,8 @@
         </nav>
 
         <main class="main-content">
-            <!-- Watchlist View -->
-            <div id="watchlistView" class="view-container active">
-                <!-- Ticker Management Section -->
+            <!-- Left Sidebar: Watchlist (Always Visible) -->
+            <aside class="sidebar-left">
                 <section class="ticker-management">
                     <div class="section-header">
                         <h2>Watchlist</h2>
@@ -50,9 +49,12 @@
                         <div class="loading">Loading tickers...</div>
                     </div>
                 </section>
+            </aside>
 
-                <!-- Ticker Information Display -->
-                <section class="ticker-info-section">
+            <!-- Right Content Area: Dynamic Content -->
+            <div class="content-right">
+                <!-- Company Information (Watchlist View) -->
+                <section id="tickerInfoSection" class="ticker-info-section view-content active">
                     <div class="section-header">
                         <h2>Company Information</h2>
                     </div>
@@ -62,11 +64,9 @@
                         </div>
                     </div>
                 </section>
-            </div>
 
-            <!-- Open Positions View -->
-            <div id="openPositionsView" class="view-container">
-                <section class="positions-section">
+                <!-- Open Positions View -->
+                <section id="openPositionsSection" class="positions-section view-content">
                     <div class="section-header">
                         <h2>Open Positions</h2>
                     </div>
@@ -74,11 +74,9 @@
                         <div class="loading">Loading open positions...</div>
                     </div>
                 </section>
-            </div>
 
-            <!-- Closed Positions View -->
-            <div id="closedPositionsView" class="view-container">
-                <section class="positions-section">
+                <!-- Closed Positions View -->
+                <section id="closedPositionsSection" class="positions-section view-content">
                     <div class="section-header">
                         <h2>Closed Positions</h2>
                     </div>

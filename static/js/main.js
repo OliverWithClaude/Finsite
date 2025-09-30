@@ -26,10 +26,10 @@ const elements = {
     // Navigation
     navBtns: document.querySelectorAll('.nav-btn'),
     
-    // Views
-    watchlistView: document.getElementById('watchlistView'),
-    openPositionsView: document.getElementById('openPositionsView'),
-    closedPositionsView: document.getElementById('closedPositionsView'),
+    // Content sections
+    tickerInfoSection: document.getElementById('tickerInfoSection'),
+    openPositionsSection: document.getElementById('openPositionsSection'),
+    closedPositionsSection: document.getElementById('closedPositionsSection'),
     
     // Watchlist elements
     addTickerBtn: document.getElementById('addTickerBtn'),
@@ -148,15 +148,19 @@ function switchView(view) {
         btn.classList.toggle('active', btn.dataset.view === view);
     });
     
-    // Update views
-    elements.watchlistView.classList.toggle('active', view === 'watchlist');
-    elements.openPositionsView.classList.toggle('active', view === 'open-positions');
-    elements.closedPositionsView.classList.toggle('active', view === 'closed-positions');
+    // Hide all content sections
+    elements.tickerInfoSection.classList.remove('active');
+    elements.openPositionsSection.classList.remove('active');
+    elements.closedPositionsSection.classList.remove('active');
     
-    // Load data for the view
-    if (view === 'open-positions') {
+    // Show the appropriate section
+    if (view === 'watchlist') {
+        elements.tickerInfoSection.classList.add('active');
+    } else if (view === 'open-positions') {
+        elements.openPositionsSection.classList.add('active');
         loadOpenPositions();
     } else if (view === 'closed-positions') {
+        elements.closedPositionsSection.classList.add('active');
         loadClosedPositions();
     }
 }
@@ -550,7 +554,7 @@ function renderOpenPositions(positions) {
                     <th>Current Price</th>
                     <th>Current Value</th>
                     <th>Unrealized P/L</th>
-                    <th>Action</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -570,6 +574,9 @@ function renderOpenPositions(positions) {
                             ` : 'N/A'}
                         </td>
                         <td>
+                            <button class="btn btn-secondary btn-chart" onclick="openChartModal(${pos.id}, '${pos.ticker}')">
+                                Chart
+                            </button>
                             <button class="btn btn-primary" onclick="openSellModal(${pos.id}, '${pos.ticker}', '${pos.entry_date}', ${pos.entry_value_eur}, ${pos.entry_price_per_share}, '${pos.entry_currency}')">
                                 Close
                             </button>
@@ -801,7 +808,7 @@ function renderChart(data) {
         hovertemplate: '%{y:.2f}<extra></extra>'
     };
     
-    // Entry marker
+    // Entry marker (same for both open and closed)
     const entryTrace = {
         x: [data.entry_date],
         y: [data.entry_price],
@@ -824,32 +831,68 @@ function renderChart(data) {
         hovertemplate: 'Entry: %{y:.2f}<extra></extra>'
     };
     
-    // Exit marker
-    const exitTrace = {
-        x: [data.exit_date],
-        y: [data.exit_price],
-        type: 'scatter',
-        mode: 'markers+text',
-        name: 'Exit',
-        marker: {
-            color: '#D08C34',  // Warm Ochre
-            size: 12,
-            symbol: 'circle'
-        },
-        text: ['Exit'],
-        textposition: 'top center',
-        textfont: {
-            size: 12,
-            color: '#D08C34',
-            family: 'Source Sans 3, sans-serif',
-            weight: 700
-        },
-        hovertemplate: 'Exit: %{y:.2f}<extra></extra>'
-    };
+    // Prepare traces array
+    const traces = [priceTrace, entryTrace];
+    
+    // Add second marker based on position status
+    if (data.is_open) {
+        // Current marker for open positions
+        const currentTrace = {
+            x: [data.current_date],
+            y: [data.current_price],
+            type: 'scatter',
+            mode: 'markers+text',
+            name: 'Current',
+            marker: {
+                color: '#2E8B8B',  // Accent Teal (same as entry)
+                size: 12,
+                symbol: 'circle'
+            },
+            text: ['Current'],
+            textposition: 'top center',
+            textfont: {
+                size: 12,
+                color: '#2E8B8B',
+                family: 'Source Sans 3, sans-serif',
+                weight: 700
+            },
+            hovertemplate: 'Current: %{y:.2f}<extra></extra>'
+        };
+        traces.push(currentTrace);
+    } else {
+        // Exit marker for closed positions
+        const exitTrace = {
+            x: [data.exit_date],
+            y: [data.exit_price],
+            type: 'scatter',
+            mode: 'markers+text',
+            name: 'Exit',
+            marker: {
+                color: '#D08C34',  // Warm Ochre
+                size: 12,
+                symbol: 'circle'
+            },
+            text: ['Exit'],
+            textposition: 'top center',
+            textfont: {
+                size: 12,
+                color: '#D08C34',
+                family: 'Source Sans 3, sans-serif',
+                weight: 700
+            },
+            hovertemplate: 'Exit: %{y:.2f}<extra></extra>'
+        };
+        traces.push(exitTrace);
+    }
+    
+    // Chart title based on position status
+    const titleText = data.is_open 
+        ? `${data.ticker} - Price History (Open Position)`
+        : `${data.ticker} - Price History`;
     
     const layout = {
         title: {
-            text: `${data.ticker} - Price History`,
+            text: titleText,
             font: {
                 family: 'Source Sans 3, sans-serif',
                 size: 18,
@@ -903,7 +946,7 @@ function renderChart(data) {
     
     Plotly.newPlot(
         'chartContainer', 
-        [priceTrace, entryTrace, exitTrace], 
+        traces, 
         layout, 
         config
     );

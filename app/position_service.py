@@ -199,9 +199,10 @@ class PositionService:
             return None
     
     def get_chart_data(self, db: Session, position_id: int) -> Dict:
-        """Get chart data for a closed position.
+        """Get chart data for both open and closed positions.
         
         Returns:
+            For closed positions:
             {
                 "ticker": "AAPL",
                 "entry_date": "2025-01-15",
@@ -211,11 +212,24 @@ class PositionService:
                 "entry_currency": "USD",
                 "start_date": "2024-11-28",
                 "end_date": "2025-05-28",
-                "prices": [
-                    {"date": "2024-11-28", "close": 145.20},
-                    ...
-                ],
-                "error": None  # or error message if failed
+                "prices": [...],
+                "is_open": False,
+                "error": None
+            }
+            
+            For open positions:
+            {
+                "ticker": "AAPL",
+                "entry_date": "2025-01-15",
+                "current_date": "2025-09-30",
+                "entry_price": 150.50,
+                "current_price": 155.00,
+                "entry_currency": "USD",
+                "start_date": "2024-11-28",
+                "end_date": "2025-09-30",
+                "prices": [...],
+                "is_open": True,
+                "error": None
             }
         """
         # Get position from database
@@ -224,59 +238,106 @@ class PositionService:
         if not position:
             return {"error": f"Position {position_id} not found"}
         
-        # Validate position is closed
-        if position.status != 'CLOSED':
-            return {"error": "Can only generate charts for closed positions"}
-        
-        # Calculate exit price: exit_value / shares
-        shares = position.entry_value_eur / position.entry_price_per_share
-        exit_price = position.exit_value_eur / shares
-        
         # Calculate date range
         entry_date = datetime.strptime(position.entry_date, '%Y-%m-%d')
-        exit_date = datetime.strptime(position.exit_date, '%Y-%m-%d')
         today = datetime.now()
         
-        days_since_exit = (today - exit_date).days
+        # Always start 90 days before entry
+        start_date = (entry_date - timedelta(days=90)).strftime('%Y-%m-%d')
         
-        if days_since_exit < 90:
-            # Recent exit - extend to today
-            start_date = (entry_date - timedelta(days=90)).strftime('%Y-%m-%d')
+        if position.status == 'OPEN':
+            # Open position: chart goes from entry-90 days to today
             end_date = today.strftime('%Y-%m-%d')
-        else:
-            # Old exit - fixed window
-            start_date = (entry_date - timedelta(days=90)).strftime('%Y-%m-%d')
-            end_date = (exit_date + timedelta(days=90)).strftime('%Y-%m-%d')
-        
-        # Get price history
-        try:
-            prices = self.price_history_service.get_price_history(
-                db=db,
-                ticker=position.ticker,
-                start_date=start_date,
-                end_date=end_date
-            )
+            current_date = end_date
             
-            if not prices:
+            # Get current price
+            current_price = self._get_current_price(position.ticker, position.entry_currency)
+            
+            if not current_price:
                 return {
-                    "error": f"No price data available for {position.ticker}"
+                    "error": f"Unable to fetch current price for {position.ticker}"
                 }
             
-            return {
-                "ticker": position.ticker,
-                "entry_date": position.entry_date,
-                "exit_date": position.exit_date,
-                "entry_price": round(position.entry_price_per_share, 2),
-                "exit_price": round(exit_price, 2),
-                "entry_currency": position.entry_currency,
-                "start_date": start_date,
-                "end_date": end_date,
-                "prices": prices,
-                "error": None
-            }
+            # Get price history
+            try:
+                prices = self.price_history_service.get_price_history(
+                    db=db,
+                    ticker=position.ticker,
+                    start_date=start_date,
+                    end_date=end_date
+                )
+                
+                if not prices:
+                    return {
+                        "error": f"No price data available for {position.ticker}"
+                    }
+                
+                return {
+                    "ticker": position.ticker,
+                    "entry_date": position.entry_date,
+                    "current_date": current_date,
+                    "entry_price": round(position.entry_price_per_share, 2),
+                    "current_price": round(current_price, 2),
+                    "entry_currency": position.entry_currency,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "prices": prices,
+                    "is_open": True,
+                    "error": None
+                }
+                
+            except Exception as e:
+                logger.error(f"Error getting chart data for open position {position_id}: {e}")
+                return {
+                    "error": "Unable to load chart data. Please try again later."
+                }
+        
+        else:  # CLOSED position
+            # Calculate exit price: exit_value / shares
+            shares = position.entry_value_eur / position.entry_price_per_share
+            exit_price = position.exit_value_eur / shares
             
-        except Exception as e:
-            logger.error(f"Error getting chart data for position {position_id}: {e}")
-            return {
-                "error": "Unable to load chart data. Please try again later."
-            }
+            # Calculate date range for closed position
+            exit_date = datetime.strptime(position.exit_date, '%Y-%m-%d')
+            days_since_exit = (today - exit_date).days
+            
+            if days_since_exit < 90:
+                # Recent exit - extend to today
+                end_date = today.strftime('%Y-%m-%d')
+            else:
+                # Old exit - fixed window
+                end_date = (exit_date + timedelta(days=90)).strftime('%Y-%m-%d')
+            
+            # Get price history
+            try:
+                prices = self.price_history_service.get_price_history(
+                    db=db,
+                    ticker=position.ticker,
+                    start_date=start_date,
+                    end_date=end_date
+                )
+                
+                if not prices:
+                    return {
+                        "error": f"No price data available for {position.ticker}"
+                    }
+                
+                return {
+                    "ticker": position.ticker,
+                    "entry_date": position.entry_date,
+                    "exit_date": position.exit_date,
+                    "entry_price": round(position.entry_price_per_share, 2),
+                    "exit_price": round(exit_price, 2),
+                    "entry_currency": position.entry_currency,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "prices": prices,
+                    "is_open": False,
+                    "error": None
+                }
+                
+            except Exception as e:
+                logger.error(f"Error getting chart data for closed position {position_id}: {e}")
+                return {
+                    "error": "Unable to load chart data. Please try again later."
+                }
